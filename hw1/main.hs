@@ -38,9 +38,11 @@ etaConverter i lexp e _ = lexp
 
 
 reducer :: Lexp -> Lexp
-reducer (Atom x) = Atom x
-reducer exp@(Lambda x y) = Lambda x $ reducer y
-reducer lexp = lexp
+reducer exp@(Atom x) = exp
+reducer exp@(Lambda x y) = Lambda x (reducer y)
+reducer exp@(Apply (Lambda x y) z) = betaReducer x y z
+reducer exp@(Apply exp1 exp2) = Apply (reducer exp1) (reducer exp2)
+-- reducer lexp = lexp
 
 -- Entry point of program
 main = do
