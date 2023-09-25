@@ -1,5 +1,6 @@
 import PA1Helper
 import System.Environment (getArgs)
+import qualified Data.Map as Map
 
 -- Haskell representation of lambda expression
 -- data Lexp = Atom String | Lambda String Lexp | Apply Lexp  Lexp 
@@ -18,31 +19,88 @@ import System.Environment (getArgs)
 id' :: Lexp -> Lexp
 id' v@(Atom _) = v
 id' lexp@(Lambda _ _) = lexp
-id' lexp@(Apply _ _) = lexp 
+id' lexp@(Apply _ _) = lexp
+
+-- from lecture
+remove :: (Eq a) => a -> [a] -> [a]
+remove x = filter (\v -> v/=x)
+
+
+freevars :: Lexp -> [String]
+freevars (Atom s)            = [s]
+freevars (Lambda v e)        = remove v (freevars e)
+freevars (Apply e1 e2)       = (freevars e1)++(freevars e2)
 
 -- You will need to write a reducer that does something more than
 -- return whatever it was given, of course!
 
-betaReducer :: String -> Lexp -> Lexp -> Lexp
-betaReducer i (Atom x) val
-    | x == i = val
-    | otherwise = Atom x
-betaReducer i (Lambda x exp) val = Lambda x (betaReducer i exp val)
-betaReducer i (Apply exp1 exp2) val = Apply (betaReducer i exp1 val) (betaReducer i exp2 val)
+alpha :: Lexp -> [String] -> Lexp
+alpha exp@(Atom s) freeVars
+    | elem s freeVars = Atom(s ++ "0")
+    | otherwise = Atom s
+alpha exp@(Lambda s e) freeVars
+    | elem s freeVars = Lambda newS (alpha e freeVars)
+    | otherwise = Lambda s (alpha e freeVars)
+    where newS = s ++ "0"
+alpha exp@(Apply e1 e2) freeVars = Apply (alpha e1 freeVars) (alpha e2 freeVars)
 
-etaConverter :: String -> Lexp -> Lexp -> Lexp -> Lexp
-etaConverter i lexp e (Atom x)
-    | x /= i = lexp
+
+beta :: String -> Lexp -> Lexp -> Lexp -> Lexp
+beta x e@(Atom tmp) m lexp
+    | x == tmp = m
     | otherwise = e
-etaConverter i lexp e _ = lexp
+beta x e@(Lambda tmp1 tmp2) m lexp
+    | elem tmp1 (freevars lexp) = Lambda newtmp1 (beta x newtmp2 m lexp)
+    | otherwise = Lambda tmp1 (beta x tmp2 m lexp)
+    where newtmp1 = tmp1 ++ "0" 
+          newtmp2 = alpha tmp2 (freevars lexp)
+beta x e@(Apply tmp1 tmp2) m lexp = Apply (beta x tmp1 m lexp) (beta x tmp2 m lexp)
+
+
+eta :: String -> Lexp -> Lexp -> Lexp -> Lexp
+-- can eta reduce if it's an atom
+eta x e m@(Atom tmp) lexp
+    | x == tmp && notElem tmp (freevars e) = e
+    | otherwise = lexp
+-- if not atom, then we can't eta reduce
+eta x e _ lexp = lexp
+
+-- alphaReducerTester :: Lexp -> Lexp
+-- alphaReducerTester lexp = alpha lexp (freevars lexp)
 
 
 reducer :: Lexp -> Lexp
-reducer exp@(Atom x) = exp
-reducer exp@(Lambda x y) = Lambda x (reducer y)
-reducer exp@(Apply (Lambda x y) z) = betaReducer x y z
-reducer exp@(Apply exp1 exp2) = Apply (reducer exp1) (reducer exp2)
--- reducer lexp = lexp
+reducer (Atom s) = Atom s
+reducer exp@(Apply (Lambda s e) v)
+    | exp == reduced = exp
+    | otherwise = reducer reduced
+    where reduced = beta s e v exp
+
+reducer exp@(Apply e1 e2) 
+    | exp == reduced = exp
+    | otherwise = reducer reduced
+    where reduced = Apply (reducer e1) (reducer e2)
+
+reducer exp@(Lambda s exp2@(Apply (Lambda s1 e) v)) 
+    | exp == reduced = exp
+    | otherwise = reducer reduced
+    where reduced = Lambda s (beta s1 e v exp2)
+
+reducer exp@(Lambda s (Apply e1 e2))
+    | exp == reduced = exp
+    | otherwise = reducer reduced
+    where reduced = eta s e1 e2 exp
+    -- | exp == reduced && exp /= betaR = betaR
+    -- | otherwise = reducer reduced
+    -- where 
+    --     reduced = eta s e1 e2 exp
+    --     betaR = Lambda s (beta s e1 e2 exp)
+reducer exp@(Lambda s e)
+    | exp == reduced = exp
+    | otherwise = reducer reduced
+    where reduced = Lambda s (reducer e)
+
+
 
 -- Entry point of program
 main = do
