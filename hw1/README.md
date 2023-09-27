@@ -1,5 +1,9 @@
 Jiawei Wu (worked alone)
 
+features: takes in a lambda expression and reduces it using alpha
+renaming, beta reduction, and eta reduction (in that order)
+
+comments & bugs:
 Eta conversion and beta reduction work fine
 
 alpha renaming basically just adds a 0 whenever its a variable that appears 
