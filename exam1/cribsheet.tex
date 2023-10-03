@@ -1,0 +1,94 @@
+\documentclass{article}
+\usepackage[margin=1.25in]{geometry}
+\usepackage{amsmath, amssymb, setspace, enumerate, enumitem}
+\usepackage{setspace}
+\usepackage{graphicx}
+\onehalfspacing
+
+\begin{document}
+    \begin{verbatim}
+*** partial sums ***
+psums :: [Integer] -> [Integer]
+psums [] = []
+psums (x:xs) = x : next x xs
+
+next :: Integer -> [Integer] -> [Integer]
+next [] = []
+next curr (x:xs) = (curr + x) : next (curr + x) xs
+
+*** partial sums with fold ***
+partialFold :: (a -> a -> a) -> [Integer] -> [Integer]
+partialFold _ [] = []
+partialFold f (x:xs) = x : helper f x xs
+
+helper :: (a -> a -> a) -> Integer -> [Integer] -> [Integer]
+helper _ _ [] = []
+helper f prev (x:xs) = f prev x : helper f (f prev x) xs
+
+*** binary map ***
+binMap :: (a -> a -> a) -> [(a, a)] -> [a]
+binMap _ [] = []
+binMap f ((p1, p2):xs) = f p1 p2 : binMap(f xs)
+
+binMap :: (a -> a -> a) -> [(a, a)] -> [a]
+binMap _ [] = []
+binMap f lst = map (\(x, y) -> f x y) lst
+
+*** factorial ***
+Factorial in haskell
+
+Factorial :: Integer -> Integer
+Factorial z
+    | z == 0 = 0
+    | otherwise = z * Factorial(z - 1)
+
+*** merge two sorted lists ***
+merge :: [a] -> [a] -> [a]
+merge [] y = y
+merge y [] = y
+merge [] [] = []
+merge (x:xs) (y:ys)
+    | x < y = x : merge xs y:ys
+    | otherwise = y : merge x:xs ys
+
+*** add tuples ***
+addTuple :: [ (Integer, Integer) ] -> [Integer]
+addTuple [] = []
+addTuple ((int1, int2):xs) = (int1 + int2) : addTuple(xs)
+
+*** easy fibonacci ***
+easyFibo :: Integer -> Integer
+easyFibo 0 = 1
+easyFibo 1 = 1
+easyFibo n = helper 2 1 1 n
+
+helper :: Integer -> Integer -> Integer -> Integer -> Integer
+helper count x y n
+    | count == n = x + y
+    | otherwise = helper (count + 1) y (x + y) n
+
+*** list of pairs to pairs of lists ***
+listToPair :: [(a, b)] -> ([a], [b])
+listToPair [] = []
+listToPair (p1, p2):xs = ([p1], [p2]) ++ (listToPair xs)
+
+listToPair :: [(a, b)] -> ([a], [b])
+listToPair [] = []
+listToPair lst = (map (\(x, y) -> x) lst, map (\(x, y) -> y) lst)
+
+*** remove duplicates in a list ***
+nub :: (Eq a) => [a] -> [a]
+nub [] = []
+nub (x:xs)
+    | elem x xs = nub xs
+    | otherwise = x : nub xs
+
+*** check if a list is in ascending order ***
+isAsc :: [Integer] -> Bool
+isAsc [] = True
+isAsc [x] = True
+isAsc (x:y:xs)
+    | x <= y = isAsc y:xs
+    | otherwise = False
+    \end{verbatim}
+\end{document}
