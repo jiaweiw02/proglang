@@ -90,5 +90,38 @@ isAsc [x] = True
 isAsc (x:y:xs)
     | x <= y = isAsc y:xs
     | otherwise = False
+
+*** powers of two lazy evaluation ***
+powerOfTwo :: [Integer]
+powerOfTwo = 1 : map (*2) powerOfTwo
+
+*** lazy sieve ***
+sieve :: (Integral a) => [a] -> [a]
+sieve (x:xs) = x : sieve (filter (\y -> y mod x /= 0) xs)
+primes :: (Integral a) => [a]
+primes = sieve (ints 2)
+
+*** quicksort ***
+quickSort :: (Ord a) => [a] -> [a]
+quickSort [] = []
+quickSort (x:xs) = [y | y <- xs, y < x] ++ [x] ++ [y | y <- xs, y > x]
+
+*** datatypes ***
+data Calculation = Add Int Int | Mul Int Int | Div Int Int
+calc :: Calculation -> Integer
+calc (Add x y) = x + y
+calc (Mul x y) = x * y
+calc (Div x y) = div x y
+
+*** stack *** 
+newStack :: Stack a
+newStack = Empty
+push :: Stack a -> a -> Stack a
+push s e = Stack e s
+pop :: Stack a -> (Stack a,a)
+pop (Stack e s) = (s,e)
+isempty :: Stack a -> Bool
+isempty Empty = True
+isempty (Stack _ _) = False
     \end{verbatim}
 \end{document}

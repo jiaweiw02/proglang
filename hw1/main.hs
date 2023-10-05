@@ -21,7 +21,7 @@ id' v@(Atom _) = v
 id' lexp@(Lambda _ _) = lexp
 id' lexp@(Apply _ _) = lexp
 
--- from lecture
+
 remove :: (Eq a) => a -> [a] -> [a]
 remove x = filter (\v -> v/=x)
 
@@ -31,8 +31,6 @@ freevars (Atom s)            = [s]
 freevars (Lambda v e)        = remove v (freevars e)
 freevars (Apply e1 e2)       = (freevars e1)++(freevars e2)
 
--- You will need to write a reducer that does something more than
--- return whatever it was given, of course!
 
 alpha :: Lexp -> [String] -> Lexp
 alpha exp@(Atom s) freeVars
@@ -58,15 +56,10 @@ beta x e@(Apply tmp1 tmp2) m lexp = Apply (beta x tmp1 m lexp) (beta x tmp2 m le
 
 
 eta :: String -> Lexp -> Lexp -> Lexp -> Lexp
--- can eta reduce if it's an atom
 eta x e m@(Atom tmp) lexp
     | x == tmp && notElem tmp (freevars e) = e
     | otherwise = lexp
--- if not atom, then we can't eta reduce
 eta x e _ lexp = lexp
-
--- alphaReducerTester :: Lexp -> Lexp
--- alphaReducerTester lexp = alpha lexp (freevars lexp)
 
 
 reducer :: Lexp -> Lexp
@@ -90,11 +83,6 @@ reducer exp@(Lambda s (Apply e1 e2))
     | exp == reduced = exp
     | otherwise = reducer reduced
     where reduced = eta s e1 e2 exp
-    -- | exp == reduced && exp /= betaR = betaR
-    -- | otherwise = reducer reduced
-    -- where 
-    --     reduced = eta s e1 e2 exp
-    --     betaR = Lambda s (beta s e1 e2 exp)
 reducer exp@(Lambda s e)
     | exp == reduced = exp
     | otherwise = reducer reduced
