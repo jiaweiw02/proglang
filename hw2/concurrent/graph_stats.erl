@@ -1,33 +1,32 @@
 -module(graph_stats).
 -import(lists, [append/2]).
--export([start/1, readFile/1, splitComma/1, splitSpace/1, partions/1]).
--export([pairEdges/1, continueReading/2, stripEndLine/1]).
+-export([start/1, readFile/1, splitComma/1, splitSpace/1, partitions/1]).
+-export([pairEdges/1, continueReading/2, stripEndLine/1, makeAtom/1]).
 
 
 readFile(File) ->
     {ok, Txt} = file:open(File, [read]),
     P = io:get_line(Txt, ""),
-    CompleteP = continueReading(P, Txt),
-    io:fwrite("~p~n", [CompleteP]),
+    CompletePartition = continueReading(P, Txt),
     file:close(File),
-    io:fwrite("closed file").
+    CompletePartition.
 
 
 % helper function for readFile, continues reading
-% all the partions
+% all the partitions
 continueReading(P, _) when P == eof -> [];
 continueReading(P, Txt) ->
-    Data = partions(Txt),
+    Data = partitions(Txt),
     StripP = stripEndLine(P),
-    NextPartion = io:get_line(Txt, ""),
-    [[StripP|Data] | continueReading(NextPartion, Txt)].
+    NextPartition = io:get_line(Txt, ""),
+    [[StripP|Data] | continueReading(NextPartition, Txt)].
 
 
 % takes a string, removes endline character
 stripEndLine(Str) ->
     NewStr = string:tokens(Str, "\n"),
-    [H|T] = NewStr,
-    io:fwrite("before ~p~n after~p~n", [Str, H]),
+    % [H|T] = NewStr,
+    H = lists:nth(1, NewStr),
     H.
 
 
@@ -45,7 +44,9 @@ pairEdges(Lst) when Lst == [] -> [];
 pairEdges(Lst) ->
     [H|T0] = Lst,
     [N1, N2|T1] = string:tokens(H, ","),
-    Pair = {N1, N2},
+    AtomN1 = list_to_atom(N1),
+    AtomN2 = list_to_atom(N2),
+    Pair = {AtomN1, AtomN2},
     [Pair | pairEdges (T0)].
 
 
@@ -55,19 +56,29 @@ splitSpace(Str) ->
     Split = string:tokens(H, " "),
     FinalList = pairEdges(Split),
     FinalList.
+
+
+makeAtom(Lst) when Lst == [] -> [];
+makeAtom(Lst) ->
+    [H|T] = Lst,
+    Atom = list_to_atom(H),
+    io:fwrite("~p~n", [Atom]),
+    [Atom | makeAtom(T)].
     
 
-% takes in P (partion), and the String of the file
-% reads 4 lines and partions it accordingly
-partions(Txt) ->
+% takes in P (partition), and the String of the file
+% reads 4 lines and partitions it accordingly
+partitions(Txt) ->
     Nodes = io:get_line(Txt, ""),
     Colors = io:get_line(Txt, ""),
     Edges = io:get_line(Txt, ""),
     SplitNodes = splitComma(Nodes),
+    AtomNodes = makeAtom(SplitNodes),
     SplitColors = splitComma(Colors),
     SplitEdges = splitSpace(Edges),
-    [SplitNodes, SplitColors, SplitEdges].
+    [AtomNodes, SplitColors, SplitEdges].
 
 
 start(InputFile) ->
-    readFile(InputFile).
+    PartitionsList = readFile(InputFile),
+    io:fwrite("~p~n", [PartitionsList]).
