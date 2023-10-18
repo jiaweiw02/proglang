@@ -79,6 +79,11 @@ partitions(Txt) ->
     [AtomNodes, SplitColors, SplitEdges].
 
 
+createActors(0) -> [];
+createActors(N) ->
+    
+
+
 start(InputFile) ->
     PartitionsList = readFile(InputFile),
     io:fwrite("~p~n", [PartitionsList]).
