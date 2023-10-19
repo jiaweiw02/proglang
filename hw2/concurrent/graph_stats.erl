@@ -43,7 +43,7 @@ splitComma(Str) ->
 pairEdges(Lst) when Lst == [] -> [];
 pairEdges(Lst) ->
     [H|T0] = Lst,
-    [N1, N2|T1] = string:tokens(H, ","),
+    [N1, N2] = string:tokens(H, ","),
     AtomN1 = list_to_atom(N1),
     AtomN2 = list_to_atom(N2),
     Pair = {AtomN1, AtomN2},
@@ -78,14 +78,33 @@ partitions(Txt) ->
     [AtomNodes, SplitColors, SplitEdges].
 
 
-createActors(0) -> [];
-createActors(N) ->
-    [spawn(actor, actor, []) | createActors(N-1)].
-    
+createActors([]) -> [];
+createActors([H|T]) ->
+    [spawn(actor, actor, H) | createActors(T)].
+
+
+sendNodeCount([], _) -> true;
+sendNodeCount([Actor | Actors], Farmer) -> 
+    Actor ! {length},
+    sendNodeCount(Actors, Farmer).
+
+
+receiveNodeCount(N) ->
+    receiveNodeCountAux(N, 0).
+
+
+receiveNodeCountAux(0, Acc) -> Acc;
+receiveNodeCountAux(N, Acc) ->
+    receive
+        S -> receiveNodeCountAux(N-1, S + Acc)
+    end.
 
 
 start(InputFile) ->
     PartitionsList = readFile(InputFile),
-    A = createActors(length(PartitionsList)),
+    A = createActors(PartitionsList),
+    Length = length(A),
+    sendNodeCount(A, self()),
+    Res = receiveNodeCount(Length),
 
-    io:fwrite("~p~n", [length(PartitionsList)]).
+    io:fwrite("~p~n", [Res]).
