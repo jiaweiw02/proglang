@@ -62,7 +62,6 @@ makeAtom(Lst) when Lst == [] -> [];
 makeAtom(Lst) ->
     [H|T] = Lst,
     Atom = list_to_atom(H),
-    io:fwrite("~p~n", [Atom]),
     [Atom | makeAtom(T)].
     
 
@@ -81,9 +80,12 @@ partitions(Txt) ->
 
 createActors(0) -> [];
 createActors(N) ->
+    [spawn(actor, actor, []) | createActors(N-1)].
     
 
 
 start(InputFile) ->
     PartitionsList = readFile(InputFile),
-    io:fwrite("~p~n", [PartitionsList]).
+    A = createActors(length(PartitionsList)),
+
+    io:fwrite("~p~n", [length(PartitionsList)]).
