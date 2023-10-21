@@ -1,5 +1,6 @@
 -module(graph_stats).
 -import(lists, [append/2]).
+-import(dict, [append_list/3, new/0]).
 -export([start/1, readFile/1, splitComma/1, splitSpace/1, partitions/1]).
 -export([pairEdges/1, continueReading/2, stripEndLine/1, makeAtom/1]).
 
@@ -75,17 +76,33 @@ partitions(Txt) ->
     AtomNodes = makeAtom(SplitNodes),
     SplitColors = splitComma(Colors),
     SplitEdges = splitSpace(Edges),
-    [AtomNodes, SplitColors, SplitEdges].
+    [dictionaryCreator(SplitColors, AtomNodes), SplitEdges].
+    % [AtomNodes, SplitColors, SplitEdges].
 
+% length of keys has to equal length of values
+dictionaryCreator(Keys, Values) ->
+    NewDict = dict:new(),
+    FinishedDict = dictionaryCreatorHelper(Keys, Values, NewDict),
+    FinishedDict.
+
+dictionaryCreatorHelper([], _, D) ->
+    D;
+dictionaryCreatorHelper([Color | Colors], [Node | Nodes], D) ->
+    NewD = dict:append_list(Color, [Node], D),
+    dictionaryCreatorHelper(Colors, Nodes, NewD).
+
+
+% BEGIN HERE (everything above is parser)
 
 createActors([]) -> [];
 createActors([H|T]) ->
-    [spawn(actor, actor, H) | createActors(T)].
+    [spawn(actor, actor, [H]) | createActors(T)].
 
 
 sendNodeCount([], _) -> true;
 sendNodeCount([Actor | Actors], Farmer) -> 
-    Actor ! {length},
+    Actor ! {length, Farmer},
+    % Actor ! {print},
     sendNodeCount(Actors, Farmer).
 
 
@@ -102,9 +119,11 @@ receiveNodeCountAux(N, Acc) ->
 
 start(InputFile) ->
     PartitionsList = readFile(InputFile),
-    A = createActors(PartitionsList),
-    Length = length(A),
-    sendNodeCount(A, self()),
-    Res = receiveNodeCount(Length),
+    % A = createActors(PartitionsList),
+    % Length = length(A),
+    % sendNodeCount(A, self()),
+    % Res = receiveNodeCount(Length),
 
-    io:fwrite("~p~n", [Res]).
+    io:fwrite("~p~n", [PartitionsList]).
+
+% c(actor), c(graph_stats), graph_stats:start("../input.txt").
