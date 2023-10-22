@@ -1,6 +1,6 @@
 -module(graph_stats).
 -import(lists, [append/2]).
--import(dict, [append_list/3, new/0]).
+-import(dict, [append/3, new/0]).
 -export([start/1, readFile/1, splitComma/1, splitSpace/1, partitions/1]).
 -export([pairEdges/1, continueReading/2, stripEndLine/1, makeAtom/1]).
 
@@ -77,7 +77,6 @@ partitions(Txt) ->
     SplitColors = splitComma(Colors),
     SplitEdges = splitSpace(Edges),
     [dictionaryCreator(SplitColors, AtomNodes), SplitEdges].
-    % [AtomNodes, SplitColors, SplitEdges].
 
 % length of keys has to equal length of values
 dictionaryCreator(Keys, Values) ->
@@ -88,7 +87,7 @@ dictionaryCreator(Keys, Values) ->
 dictionaryCreatorHelper([], _, D) ->
     D;
 dictionaryCreatorHelper([Color | Colors], [Node | Nodes], D) ->
-    NewD = dict:append_list(Color, [Node], D),
+    NewD = dict:store(Node, Color, D),
     dictionaryCreatorHelper(Colors, Nodes, NewD).
 
 
@@ -99,31 +98,65 @@ createActors([H|T]) ->
     [spawn(actor, actor, [H]) | createActors(T)].
 
 
-sendNodeCount([], _) -> true;
-sendNodeCount([Actor | Actors], Farmer) -> 
-    Actor ! {length, Farmer},
-    % Actor ! {print},
-    sendNodeCount(Actors, Farmer).
+sendF([], _, _) -> true;
+sendF([Actor | Actors], Farmer, Message) -> 
+    Actor ! {Message, Farmer},
+    sendF(Actors, Farmer, Message).
 
-
-receiveNodeCount(N) ->
-    receiveNodeCountAux(N, 0).
-
-
-receiveNodeCountAux(0, Acc) -> Acc;
-receiveNodeCountAux(N, Acc) ->
+receiveF(N) ->
+    F = fun(_, V1, V2) ->
+        V1 + V2
+    end,
+    receiveFAux(N, dict:new(), dict:new(), F).
+receiveFAux(0, Node, Edge, _) -> [Node, Edge];
+receiveFAux(N, Node, Edge, F) ->
     receive
-        S -> receiveNodeCountAux(N-1, S + Acc)
+        [CurrNode, CurrEdge] -> 
+            receiveFAux(N-1, dict:merge(F, CurrNode, Node), dict:merge(F, CurrEdge, Edge), F)
     end.
 
 
+% % edge count
+% sendEdgeCount([], _) -> true;
+% sendEdgeCount([Actor | Actors], Farmer) ->
+%     Actor ! {edge, Farmer},
+%     sendEdgeCount(Actors, Farmer).
+
+
+% printDictHelper([], _) -> true;
+% printDictHelper([Key | Keys], Dict) ->
+%     Value = dict:fetch(Key, Dict),
+%     io:fwrite("~p: ~p~n", [Key, Value]),
+%     printDictHelper(Keys, Dict).
+% printDict(Dict) ->
+%     Keys = dict:fetch_keys(Dict),
+%     Size = dict:size(Dict),
+%     io:fwrite("Size of dictionary: ~p~n", [Size]),
+%     printDictHelper(Keys, Dict).
+
+partA([], _, _) -> ok;
+partA([Key | Keys], NodeCountRes, EdgeCountRes) ->
+    NodeCount = dict:fetch(Key, NodeCountRes),
+    EdgeCount = dict:fetch(Key, EdgeCountRes),
+    KeyAtom = list_to_atom(Key),
+    io:fwrite("~p, ~p, ~p~n", [KeyAtom, NodeCount, EdgeCount]),
+    partA(Keys, NodeCountRes, EdgeCountRes).
+
 start(InputFile) ->
     PartitionsList = readFile(InputFile),
-    % A = createActors(PartitionsList),
-    % Length = length(A),
-    % sendNodeCount(A, self()),
-    % Res = receiveNodeCount(Length),
-
-    io:fwrite("~p~n", [PartitionsList]).
+    A = createActors(PartitionsList),
+    Length = length(A),
+    sendF(A, self(), partA),
+    [NodeCountRes, EdgeCountRes] = receiveF(Length),
+    Keys = dict:fetch_keys(NodeCountRes),
+    partA(Keys, NodeCountRes, EdgeCountRes).
+    % printDict(NodeCountRes),
+    % printDict(EdgeCountRes),
+    
+    % edges
+    % sendF(A, self(), edges),
+    % EdgeCountRes = receiveF(Length),
+    % io:fwrite("~p~n", [PartitionsList]),
+    % io:fwrite("done").
 
 % c(actor), c(graph_stats), graph_stats:start("../input.txt").
