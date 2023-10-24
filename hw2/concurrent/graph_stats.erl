@@ -51,6 +51,81 @@ computeEdgeLengthHelper([P | Ps], DictCount, Dict) ->
 
 computeEdgeLength(Dict, AllPairs) ->
     computeEdgeLengthHelper(AllPairs, dict:new(), Dict).
+
+
+computeDegreeAndExternalHelper([], DegreeCount, External, _) -> [DegreeCount, External];
+computeDegreeAndExternalHelper([P | Ps], DegreeCount, External, Dict) ->
+    {P1, P2} = P,
+    % node : color
+    % pairs : P1, P2 -> first and second nodes respectively
+    P1InDict = dict:is_key(P1, Dict),
+    P2InDict = dict:is_key(P2, Dict),
+    if 
+        % P1 in dict
+        P1InDict ->
+            NewDegreeCount = dict:update_counter(P1, 1, DegreeCount),
+            if
+                P2InDict ->
+                    % Color2 = dict:fetch(P2, Dict),
+                    NewDegreeCount1 = dict:update_counter(P2, 1, NewDegreeCount),
+                    computeDegreeAndExternalHelper(Ps, NewDegreeCount1, External, Dict);
+                true ->
+                    NewExternal = lists:append([P2], External),
+                    computeDegreeAndExternalHelper(Ps, NewDegreeCount, NewExternal, Dict)
+            end;
+        % P1 not in dict
+        true ->
+            % Color2 = dict:fetch(P2, Dict),
+            NewDegreeCount1 = dict:update_counter(P2, 1, DegreeCount),
+            NewExternal = lists:append([P1], External),
+            computeDegreeAndExternalHelper(Ps, NewDegreeCount1, NewExternal, Dict)
+    end.
+
+computeDegreeAndExternal(Dict, AllPairs) ->
+    computeDegreeAndExternalHelper(AllPairs, dict:new(), [], Dict).
+
+
+
+% we can assume that the node exists somewhere, so we don't need an ending
+% condition
+% takes in a node and all actors, returns the edge length of that node
+sendNodeEdges(_, [], _) -> ok;
+sendNodeEdges(Node, [A | As], CurrActor) ->
+    if
+        A == CurrActor ->
+            sendNodeEdges(Node, As, CurrActor);
+        true ->
+            io:fwrite("SEND~n"),
+            A ! {getNode, Node, self()},
+            sendNodeEdges(Node, As, CurrActor)
+    end.
+            
+
+receiveNodeEdges(0, Res) -> Res;
+receiveNodeEdges(N, Res) ->
+    io:fwrite("RECEIVE~n"),
+    receive
+        Num ->
+            if Num == 0 ->
+                receiveNodeEdges(N - 1, Res);
+            true ->
+                receiveNodeEdges(N - 1, Num)
+        end
+    end.
+
+
+% takes in external nodes and all actors, requests them for the edge count
+% if it exists in their partition, [atom], [Actor]
+computeExternalNode_EdgeCountHelper([], _, Res, _) -> Res;
+computeExternalNode_EdgeCountHelper([N | Ns], Actors, Res, CurrActor) ->
+    % get edge length of node N
+    sendNodeEdges(N, Actors, CurrActor),
+    Length = length(Actors),
+    N_EdgeLength = receiveNodeEdges(Length - 1, 0),
+    NewDict = dict:store(N, N_EdgeLength, Res),
+    computeExternalNode_EdgeCountHelper(Ns, Actors, NewDict, CurrActor).
+computeExternalNode_EdgeCount(ExternalNodes, Actors, CurrActor) ->
+    computeExternalNode_EdgeCountHelper(ExternalNodes, Actors, dict:new(), CurrActor).
     
 
 actor(Content) ->
@@ -69,9 +144,30 @@ actor(Content) ->
             EdgeLength = computeEdgeLength(Dict, AllPairs),
             Data = [ColorLength, EdgeLength],
             Farmer ! Data;
-        {print} ->
-            % io:fwrite("this is my content ~n~w~n", Content)
-            io:fwrite("HELLO YES THE CONTENT IS STORED")
+        {partB, Farmer, Actors} ->
+            Partition = lists:nth(1, Content),
+            io:fwrite("BEGIN: ~p~n", [Partition]),
+            Dict = lists:nth(2, Content),
+            AllPairs = lists:nth(3, Content),
+            [Node_DegreeCount, ExternalNodes] = computeDegreeAndExternal(Dict, AllPairs),
+            ExternalNode_EdgeCount = computeExternalNode_EdgeCount(ExternalNodes, Actors, self()),
+            io:fwrite("END: ~p~n", [Partition]),
+            Farmer ! [Partition, Node_DegreeCount, ExternalNodes];
+        {getNode, Node, Farmer} ->
+            Partition = lists:nth(1, Content),
+            io:fwrite("CHECKING PARTITION: ~p~n", [Partition]),
+            Dict = lists:nth(2, Content),
+            AllPairs = lists:nth(3, Content),
+            InDict = dict:is_key(Node, Dict),
+            
+            if
+                InDict ->
+                    [Node_DegreeCount, _] = computeDegreeAndExternal(Dict, AllPairs),
+                    Value = dict:fetch(Node, Node_DegreeCount),
+                    Farmer ! Value;
+                true ->
+                    Farmer ! 0
+            end
     end.
 
 create(Content) -> spawn(graph_stats, actor, [Content]).
@@ -171,22 +267,44 @@ createActors([H|T]) ->
     [create(H) | createActors(T)].
 
 
-sendF([], _, _) -> true;
-sendF([Actor | Actors], Farmer, Message) -> 
+sendFA([], _, _) -> true;
+sendFA([Actor | Actors], Farmer, Message) -> 
     Actor ! {Message, Farmer},
-    sendF(Actors, Farmer, Message).
+    sendFA(Actors, Farmer, Message).
 
-receiveF(N) ->
+receiveFA(N) ->
     F = fun(_, V1, V2) ->
         V1 + V2
     end,
-    receiveFAux(N, dict:new(), dict:new(), F).
-receiveFAux(0, Node, Edge, _) -> [Node, Edge];
-receiveFAux(N, Node, Edge, F) ->
+    receiveFAuxA(N, dict:new(), dict:new(), F).
+receiveFAuxA(0, Node, Edge, _) -> [Node, Edge];
+receiveFAuxA(N, Node, Edge, F) ->
     receive
         [CurrNode, CurrEdge] -> 
-            receiveFAux(N-1, dict:merge(F, CurrNode, Node), dict:merge(F, CurrEdge, Edge), F)
+            receiveFAuxA(N-1, dict:merge(F, CurrNode, Node), dict:merge(F, CurrEdge, Edge), F)
     end.
+
+sendFB([], _, _) -> true;
+sendFB([Actor | Actors], Farmer, Message) -> 
+    if 
+        Message == partB ->
+            Actor ! {Message, Farmer, [Actor | Actors]};
+        Message == partA ->
+            Actor ! {partA, Farmer}
+    end,
+    sendFB(Actors, Farmer, Message).
+
+% part b receives partition number, degree of each internal node, list of external nodes
+receiveFAuxB(0, ResDict) -> ResDict;
+receiveFAuxB(N, ResDict) ->
+    receive
+        [PNum, DegreesDict, ExternalList] -> 
+            receiveFAuxB(N-1, dict:store(PNum, [DegreesDict, ExternalList], ResDict));
+        O -> io:fwrite("~p~n", [O])
+    end.
+receiveFB(N) ->
+    receiveFAuxB(N, dict:new()).
+
 
 
 % % edge count
@@ -196,16 +314,16 @@ receiveFAux(N, Node, Edge, F) ->
 %     sendEdgeCount(Actors, Farmer).
 
 
-% printDictHelper([], _) -> true;
-% printDictHelper([Key | Keys], Dict) ->
-%     Value = dict:fetch(Key, Dict),
-%     io:fwrite("~p: ~p~n", [Key, Value]),
-%     printDictHelper(Keys, Dict).
-% printDict(Dict) ->
-%     Keys = dict:fetch_keys(Dict),
-%     Size = dict:size(Dict),
-%     io:fwrite("Size of dictionary: ~p~n", [Size]),
-%     printDictHelper(Keys, Dict).
+printDictHelper([], _) -> true;
+printDictHelper([Key | Keys], Dict) ->
+    Value = dict:fetch(Key, Dict),
+    io:fwrite("~p: ~p~n", [Key, Value]),
+    printDictHelper(Keys, Dict).
+printDict(Dict) ->
+    Keys = dict:fetch_keys(Dict),
+    Size = dict:size(Dict),
+    io:fwrite("Size of dictionary: ~p~n", [Size]),
+    printDictHelper(Keys, Dict).
 
 partA([], _, _) -> ok;
 partA([Key | Keys], NodeCountRes, EdgeCountRes) ->
@@ -217,12 +335,19 @@ partA([Key | Keys], NodeCountRes, EdgeCountRes) ->
 
 start(InputFile) ->
     PartitionsList = readFile(InputFile),
+
     A = createActors(PartitionsList),
     Length = length(A),
-    sendF(A, self(), partA),
-    [NodeCountRes, EdgeCountRes] = receiveF(Length),
+    sendFA(A, self(), partA),
+    [NodeCountRes, EdgeCountRes] = receiveFA(Length),
     Keys = dict:fetch_keys(NodeCountRes),
-    partA(Keys, NodeCountRes, EdgeCountRes).
+    partA(Keys, NodeCountRes, EdgeCountRes),
+
+    B = createActors(PartitionsList),
+    Length = length(B),
+    sendFB(B, self(), partB),
+    ResDict = receiveFB(Length),
+    printDict(ResDict).
     % printDict(NodeCountRes),
     % printDict(EdgeCountRes),
     

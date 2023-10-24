@@ -182,7 +182,7 @@ receiveFAux(N, ResDict) ->
         [PNum, DegreesDict, ExternalList] -> 
             receiveFAux(N-1, dict:store(PNum, [DegreesDict, ExternalList], ResDict))
     end.
-receiveF(N) ->
+receiveFB(N) ->
     % F = fun(_, V1, V2) ->
     %     V1 + V2
     % end,
@@ -213,7 +213,7 @@ start(InputFile) ->
     A = createActors(PartitionsList),
     Length = length(A),
     sendF(A, self(), partB),
-    ResDict = receiveF(Length),
+    ResDict = receiveFB(Length),
     printDict(ResDict).
     % [NodeCountRes, EdgeCountRes] = receiveF(Length),
     % Keys = dict:fetch_keys(NodeCountRes),
