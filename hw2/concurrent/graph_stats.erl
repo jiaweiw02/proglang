@@ -4,8 +4,9 @@
 % for actor
 -export([create/1, actor/1, computeColorLength/1, computeEdgeLength/2]).
 % rest
--export([start/1, readFile/1, splitComma/1, splitSpace/1, partitions/1]).
--export([pairEdges/1, continueReading/2, stripEndLine/1, makeAtom/1]).
+% -export([start/3, readFile/1, splitComma/1, splitSpace/1, partitions/1]).
+% -export([pairEdges/1, continueReading/2, stripEndLine/1, makeAtom/1]).
+-export([start/3]).
 
 % actor stuff
 computeColorLengthHelper([], DictCount, _) -> DictCount;
@@ -85,47 +86,61 @@ computeDegreeAndExternal(Dict, AllPairs) ->
     computeDegreeAndExternalHelper(AllPairs, dict:new(), [], Dict).
 
 
-
-% we can assume that the node exists somewhere, so we don't need an ending
-% condition
-% takes in a node and all actors, returns the edge length of that node
-sendNodeEdges(_, [], _) -> ok;
-sendNodeEdges(Node, [A | As], CurrActor) ->
+% ask the actors if the node is their internal node
+contactActors(_, [], _) -> ok;
+contactActors(Node, [Actor | Actors], Me) ->
     if
-        A == CurrActor ->
-            sendNodeEdges(Node, As, CurrActor);
+        Actor == Me ->
+            contactActors(Node, Actors, Me);
         true ->
-            io:fwrite("SEND~n"),
-            A ! {getNode, Node, self()},
-            sendNodeEdges(Node, As, CurrActor)
+            Actor ! {getNode, Node, self()},
+            contactActors(Node, Actors, Me)
     end.
-            
 
-receiveNodeEdges(0, Res) -> Res;
-receiveNodeEdges(N, Res) ->
-    io:fwrite("RECEIVE~n"),
+receiveActor(0, Res) -> Res;
+receiveActor(N, Res) ->
     receive
-        Num ->
-            if Num == 0 ->
-                receiveNodeEdges(N - 1, Res);
+        {nodeCount, V} -> 
+            if V == 0 ->
+                receiveActor(N-1, Res);
             true ->
-                receiveNodeEdges(N - 1, Num)
-        end
+                receiveActor(N-1, V)
+            end;
+        A -> 
+            io:fwrite("~p~n", [A]),
+            receiveActor(N-1, Res)
     end.
 
 
-% takes in external nodes and all actors, requests them for the edge count
-% if it exists in their partition, [atom], [Actor]
-computeExternalNode_EdgeCountHelper([], _, Res, _) -> Res;
-computeExternalNode_EdgeCountHelper([N | Ns], Actors, Res, CurrActor) ->
-    % get edge length of node N
-    sendNodeEdges(N, Actors, CurrActor),
-    Length = length(Actors),
-    N_EdgeLength = receiveNodeEdges(Length - 1, 0),
-    NewDict = dict:store(N, N_EdgeLength, Res),
-    computeExternalNode_EdgeCountHelper(Ns, Actors, NewDict, CurrActor).
-computeExternalNode_EdgeCount(ExternalNodes, Actors, CurrActor) ->
-    computeExternalNode_EdgeCountHelper(ExternalNodes, Actors, dict:new(), CurrActor).
+% 1 : all external nodes
+% 2 : all actors
+% 3 : the actor calling other actors
+computeExternal([], _, _, Dict_External_Edge) -> Dict_External_Edge;
+computeExternal([Node | Nodes], Actors, Me, Dict_External_Edge) ->
+    contactActors(Node, Actors, Me),
+    ReceiveLength = length(Actors),
+    Res = receiveActor(ReceiveLength, 0),
+    NewDict = dict:store(Node, Res, Dict_External_Edge),
+    computeExternal(Nodes, Actors, Me, NewDict).
+
+
+% takes in a dictionary [Atom : EdgeCount], outputs a list of Atoms of highest EdgeCount
+highCountHelper([], _, _, ResList) -> ResList;
+highCountHelper([Key | Keys], Dict, HighestCount, ResList) ->
+    EdgeCount = dict:fetch(Key, Dict),
+    if 
+        EdgeCount > HighestCount ->
+            highCountHelper(Keys, Dict, EdgeCount, [Key]);
+        EdgeCount == HighestCount ->
+            NewList = lists:append(ResList, [Key]),
+            highCountHelper(Keys, Dict, HighestCount, NewList);
+        true ->
+            highCountHelper(Keys, Dict, HighestCount, ResList)
+    end.
+
+highCount(Dict) ->
+    Keys = dict:fetch_keys(Dict),
+    highCountHelper(Keys, Dict, 0, []).
     
 
 actor(Content) ->
@@ -146,16 +161,20 @@ actor(Content) ->
             Farmer ! Data;
         {partB, Farmer, Actors} ->
             Partition = lists:nth(1, Content),
-            io:fwrite("BEGIN: ~p~n", [Partition]),
             Dict = lists:nth(2, Content),
             AllPairs = lists:nth(3, Content),
             [Node_DegreeCount, ExternalNodes] = computeDegreeAndExternal(Dict, AllPairs),
-            ExternalNode_EdgeCount = computeExternalNode_EdgeCount(ExternalNodes, Actors, self()),
-            io:fwrite("END: ~p~n", [Partition]),
-            Farmer ! [Partition, Node_DegreeCount, ExternalNodes];
+            ExternalDict = computeExternal(ExternalNodes, Actors, self(), dict:new()),
+
+            F = fun(_, V1, _) ->
+                V1
+            end,
+
+            CombinedDict = dict:merge(F, ExternalDict, Node_DegreeCount),
+            NodesHighestEdges = highCount(CombinedDict),
+            Farmer ! [Partition, Node_DegreeCount, NodesHighestEdges],
+            actor(Content);
         {getNode, Node, Farmer} ->
-            Partition = lists:nth(1, Content),
-            io:fwrite("CHECKING PARTITION: ~p~n", [Partition]),
             Dict = lists:nth(2, Content),
             AllPairs = lists:nth(3, Content),
             InDict = dict:is_key(Node, Dict),
@@ -164,10 +183,11 @@ actor(Content) ->
                 InDict ->
                     [Node_DegreeCount, _] = computeDegreeAndExternal(Dict, AllPairs),
                     Value = dict:fetch(Node, Node_DegreeCount),
-                    Farmer ! Value;
+                    Farmer ! {nodeCount, Value};
                 true ->
-                    Farmer ! 0
-            end
+                    Farmer ! {nodeCount, 0}
+            end,
+            actor(Content)
     end.
 
 create(Content) -> spawn(graph_stats, actor, [Content]).
@@ -284,23 +304,22 @@ receiveFAuxA(N, Node, Edge, F) ->
             receiveFAuxA(N-1, dict:merge(F, CurrNode, Node), dict:merge(F, CurrEdge, Edge), F)
     end.
 
-sendFB([], _, _) -> true;
-sendFB([Actor | Actors], Farmer, Message) -> 
+sendFB([], _, _, _) -> true;
+sendFB([Actor | Actors], Farmer, Message, AllActors) -> 
     if 
         Message == partB ->
-            Actor ! {Message, Farmer, [Actor | Actors]};
+            Actor ! {partB, Farmer, AllActors};
         Message == partA ->
             Actor ! {partA, Farmer}
     end,
-    sendFB(Actors, Farmer, Message).
+    sendFB(Actors, Farmer, Message, AllActors).
 
 % part b receives partition number, degree of each internal node, list of external nodes
 receiveFAuxB(0, ResDict) -> ResDict;
 receiveFAuxB(N, ResDict) ->
     receive
-        [PNum, DegreesDict, ExternalList] -> 
-            receiveFAuxB(N-1, dict:store(PNum, [DegreesDict, ExternalList], ResDict));
-        O -> io:fwrite("~p~n", [O])
+        [PNum, _, NodesHighestEdges] -> 
+            receiveFAuxB(N-1, dict:store(PNum, NodesHighestEdges, ResDict))
     end.
 receiveFB(N) ->
     receiveFAuxB(N, dict:new()).
@@ -314,40 +333,77 @@ receiveFB(N) ->
 %     sendEdgeCount(Actors, Farmer).
 
 
-printDictHelper([], _) -> true;
-printDictHelper([Key | Keys], Dict) ->
-    Value = dict:fetch(Key, Dict),
-    io:fwrite("~p: ~p~n", [Key, Value]),
-    printDictHelper(Keys, Dict).
-printDict(Dict) ->
-    Keys = dict:fetch_keys(Dict),
-    Size = dict:size(Dict),
-    io:fwrite("Size of dictionary: ~p~n", [Size]),
-    printDictHelper(Keys, Dict).
+% printDictHelper([], _) -> true;
+% printDictHelper([Key | Keys], Dict) ->
+%     Value = dict:fetch(Key, Dict),
+%     io:fwrite("~p: ~p~n", [Key, Value]),
+%     printDictHelper(Keys, Dict).
+% printDict(Dict) ->
+%     Keys = dict:fetch_keys(Dict),
+%     Size = dict:size(Dict),
+%     io:fwrite("Size of dictionary: ~p~n", [Size]),
+%     printDictHelper(Keys, Dict).
 
-partA([], _, _) -> ok;
-partA([Key | Keys], NodeCountRes, EdgeCountRes) ->
+partA([], _, _, _) -> ok;
+partA([Key | Keys], NodeCountRes, EdgeCountRes, OutFile) ->
     NodeCount = dict:fetch(Key, NodeCountRes),
     EdgeCount = dict:fetch(Key, EdgeCountRes),
     KeyAtom = list_to_atom(Key),
-    io:fwrite("~p, ~p, ~p~n", [KeyAtom, NodeCount, EdgeCount]),
-    partA(Keys, NodeCountRes, EdgeCountRes).
+    FormattedStr = io_lib:format("~p, ~p, ~p~n", [KeyAtom, NodeCount, EdgeCount]),
+    file:write(OutFile, FormattedStr),
+    partA(Keys, NodeCountRes, EdgeCountRes, OutFile).
 
-start(InputFile) ->
-    PartitionsList = readFile(InputFile),
+
+printListAtoms([], _) -> ok;
+printListAtoms([N], OutFile) ->
+    AtomStr = atom_to_list(N),
+    FormattedStr = io_lib:format("~s~n", [AtomStr]),
+    file:write(OutFile, FormattedStr),
+    ok;
+printListAtoms([N |Ns], OutFile) ->
+    AtomStr = atom_to_list(N),
+    FormattedStr = io_lib:format("~s,", [AtomStr]),
+    file:write(OutFile, FormattedStr),
+    printListAtoms(Ns, OutFile).
+
+partBHelper([], _, Res, _) -> Res;
+partBHelper([P | Ps], Dict, Res, OutFile) ->
+    Nodes = dict:fetch(P, Dict),
+    FormattedStr = io_lib:format("~s: ", [P]),
+    file:write(OutFile, FormattedStr),
+    printListAtoms(Nodes, OutFile),
+    NewRes = lists:append(Res, Nodes),
+    partBHelper(Ps, Dict, NewRes, OutFile).
+
+
+partB(ResDict, OutFile) ->
+    P = dict:fetch_keys(ResDict),
+    Res = partBHelper(P, ResDict, [], OutFile),
+    NewRes = lists:usort(Res),
+    file:write(OutFile, "G: "),
+    printListAtoms(NewRes, OutFile).
+
+
+
+start(Input_file_path, Part_a_output_file_path, Part_b_output_file_path) ->
+    PartitionsList = readFile(Input_file_path),
+    {ok, OutA} = file:open(Part_a_output_file_path, [write]),
+    {ok, OutB} = file:open(Part_b_output_file_path, [write]),
 
     A = createActors(PartitionsList),
     Length = length(A),
     sendFA(A, self(), partA),
     [NodeCountRes, EdgeCountRes] = receiveFA(Length),
     Keys = dict:fetch_keys(NodeCountRes),
-    partA(Keys, NodeCountRes, EdgeCountRes),
+    partA(Keys, NodeCountRes, EdgeCountRes, OutA),
 
     B = createActors(PartitionsList),
+    CopyB = createActors(PartitionsList),
     Length = length(B),
-    sendFB(B, self(), partB),
+    sendFB(B, self(), partB, CopyB),
     ResDict = receiveFB(Length),
-    printDict(ResDict).
+    partB(ResDict, OutB).
+    % printDict(ResDict).
     % printDict(NodeCountRes),
     % printDict(EdgeCountRes),
     
@@ -357,4 +413,4 @@ start(InputFile) ->
     % io:fwrite("~p~n", [PartitionsList]),
     % io:fwrite("done").
 
-% c(graph_stats), graph_stats:start("../input.txt").
+% c(graph_stats), graph_stats:start("../input.txt", "outA.txt", "outB.txt").
