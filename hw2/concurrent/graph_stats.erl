@@ -2,11 +2,8 @@
 -import(lists, []).
 -import(dict, []).
 % for actor
--export([create/1, actor/1, computeColorLength/1, computeEdgeLength/2]).
-% rest
-% -export([start/3, readFile/1, splitComma/1, splitSpace/1, partitions/1]).
-% -export([pairEdges/1, continueReading/2, stripEndLine/1, makeAtom/1]).
--export([start/3]).
+% -compile(export_all).
+-export([start/3, actor/1]).
 
 % actor stuff
 computeColorLengthHelper([], DictCount, _) -> DictCount;
@@ -324,26 +321,6 @@ receiveFAuxB(N, ResDict) ->
 receiveFB(N) ->
     receiveFAuxB(N, dict:new()).
 
-
-
-% % edge count
-% sendEdgeCount([], _) -> true;
-% sendEdgeCount([Actor | Actors], Farmer) ->
-%     Actor ! {edge, Farmer},
-%     sendEdgeCount(Actors, Farmer).
-
-
-% printDictHelper([], _) -> true;
-% printDictHelper([Key | Keys], Dict) ->
-%     Value = dict:fetch(Key, Dict),
-%     io:fwrite("~p: ~p~n", [Key, Value]),
-%     printDictHelper(Keys, Dict).
-% printDict(Dict) ->
-%     Keys = dict:fetch_keys(Dict),
-%     Size = dict:size(Dict),
-%     io:fwrite("Size of dictionary: ~p~n", [Size]),
-%     printDictHelper(Keys, Dict).
-
 partA([], _, _, _) -> ok;
 partA([Key | Keys], NodeCountRes, EdgeCountRes, OutFile) ->
     NodeCount = dict:fetch(Key, NodeCountRes),
@@ -402,15 +379,7 @@ start(Input_file_path, Part_a_output_file_path, Part_b_output_file_path) ->
     Length = length(B),
     sendFB(B, self(), partB, CopyB),
     ResDict = receiveFB(Length),
-    partB(ResDict, OutB).
-    % printDict(ResDict).
-    % printDict(NodeCountRes),
-    % printDict(EdgeCountRes),
-    
-    % edges
-    % sendF(A, self(), edges),
-    % EdgeCountRes = receiveF(Length),
-    % io:fwrite("~p~n", [PartitionsList]),
-    % io:fwrite("done").
+    partB(ResDict, OutB),
+    ok.
 
 % c(graph_stats), graph_stats:start("../input.txt", "outA.txt", "outB.txt").
