@@ -6,3 +6,4 @@ parent(carol, emma). % Carol is a parent of Emma
 
 % Rule
 grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
+sss
