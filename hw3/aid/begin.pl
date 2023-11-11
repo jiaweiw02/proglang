@@ -1,8 +1,11 @@
-% Facts
-parent(alice, bob). % Alice is a parent of Bob
-parent(alice, carol). % Alice is a parent of Carol
-parent(bob, david). % Bob is a parent of David
-parent(carol, emma). % Carol is a parent of Emma
+% facts
+male(adrian).
+male(jericho).
+male(jiawei).
+likes(adrian, jericho).
+likes(jericho, adrian).
+likes(adrian, jiawei).
+likes(jericho, jiawei).
 
-% Rule
-grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
+% rules
+gay(X) :- likes(X, Y).
