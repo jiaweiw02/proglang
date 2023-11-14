@@ -1,11 +1,14 @@
-% facts
-male(adrian).
-male(jericho).
-male(jiawei).
-likes(adrian, jericho).
-likes(jericho, adrian).
-likes(adrian, jiawei).
-likes(jericho, jiawei).
+directSeniorOf(Senior, Junior). % Senior spends more time in Hogwarts than Juniors
 
-% rules
-gay(X) :- likes(X, Y).
+isSeniorOf(PersonA, PersonB) :-
+    (
+        directSeniorOf(PersonA, PersonB),
+        PersonA \= PersonB
+    ) ;
+    (
+        directSeniorOf(PersonA, PersonC),
+        isSeniorOf(PersonC, PersonB),
+        PersonA \= PersonB,
+        PersonA \= PersonC,
+        PersonB \= PersonC
+    ).
