@@ -1,11 +1,3 @@
-% facts
-% teacherOf(Teacher, Student).
-% directSeniorOf(Senior, Junior).
-% birthYear(Person, Year).
-% houseOf(House, Student).
-% farLocation(HouseA, HouseB).
-% quidditchTeamOf(Team, Student).
-
 % rules
 classmates(StudentOne, StudentTwo) :- 
     teacherOf(Teacher, StudentOne),
@@ -48,8 +40,6 @@ youngestStudent(Person, House) :-
     birthYear(Person, Year),
     \+ (houseOf(House, Person2), birthYear(Person2, Year2), Year2 > Year).
 
-% oldestQuidditchStudent(Team, Student): Student is the oldest among all the students within the Quidditch
-% Team.
 
 oldestQuidditchStudent(Team, Student) :-
     quidditchTeamOf(Team, Student),
