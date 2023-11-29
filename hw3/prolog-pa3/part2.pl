@@ -1,5 +1,6 @@
 :- [hogwarts].
 :- [part2Helper].
+:- use_module(library(clpfd)).
 
 % Hints:
 %   for NLP parser make sure you match the type of the atom: 
@@ -26,6 +27,41 @@ nlpParser([[House, house, wants, total, volume, CompSize, than, Size, cubic, fee
     atom_number(Size, SizeNumber),
     nlpParser(T, ItemC, ItemR, [ [House, CompPrice, PriceNumber, CompSize, SizeNumber] | ConstraintC], ConstraintR).
 
+% totalPrice([], Res, Res).
+% totalPrice([[_, _, Price, _] | T], Sum, Res) :-
+%     totalPrice(T, Sum + Price, Res).
+
+% totalSize([], Res, Res).
+% totalSize([[_, _, _, Size] | T], Sum, Res) :-
+%     totalSize(T, Sum + Size, Res).
+
+priceIsGreater(Price, Items) :-
+    maplist(nth0(2), Items, Prices),
+    sum_list(Prices, TotalPrice),
+    TotalPrice > Price.
+
+priceIsSmaller(Price, Items) :-
+    maplist(nth0(2), Items, Prices),
+    sum_list(Prices, TotalPrice),
+    TotalPrice < Price.
+
+% choose combinations of items such that the total of all items is greater than price
+priceGreater(Items, Price) :-
+    findall(Subset, subset(Items, Subset), Subsets),
+    maplist(nth0(30), Subsets, One),
+    maplist(nth0(5), Subsets, Two),
+    writeln(One),
+    writeln(Two),
+    writeln(Subsets).
+    % include(priceIsGreater(Price), Subsets, ValidSubsets),
+    % writeln(ValidSubsets).
+
+priceSmaller(Items, Price) :-
+    findall(Subset, subset(Items, Subset), Subsets),
+    include(priceIsSmaller(Price), Subsets, ValidSubsets),
+    writeln(ValidSubsets).
+
+
 % Main 
 main :-
     current_prolog_flag(argv, [DataFile|_]),
@@ -34,8 +70,12 @@ main :-
     nlpParser(Lines, [], ItemsReversed, [], ConstraintsReversed),
     reverse(ItemsReversed, Items),
     reverse(ConstraintsReversed, Constraints),
-    writeln(Items),
-    writeln(Constraints),
+    % writeln(Items),
+    % writeln(Constraints),
+    % priceGreater(Items, 1000),
+    Vs = [_,_,_], 
+    global_cardinality(Vs, [1-2,3-_]), 
+    label(Vs),
     close(Stream).
 
 
