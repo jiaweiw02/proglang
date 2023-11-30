@@ -45,21 +45,55 @@ priceIsSmaller(Price, Items) :-
     sum_list(Prices, TotalPrice),
     TotalPrice < Price.
 
-% choose combinations of items such that the total of all items is greater than price
-priceGreater(Items, Price) :-
-    findall(Subset, subset(Items, Subset), Subsets),
-    maplist(nth0(30), Subsets, One),
-    maplist(nth0(5), Subsets, Two),
-    writeln(One),
-    writeln(Two),
-    writeln(Subsets).
-    % include(priceIsGreater(Price), Subsets, ValidSubsets),
-    % writeln(ValidSubsets).
+sizeIsGreater(Size, Items) :-
+    maplist(nth0(3), Items, Sizes),
+    sum_list(Sizes, TotalSize),
+    TotalSize > Size.
 
-priceSmaller(Items, Price) :-
-    findall(Subset, subset(Items, Subset), Subsets),
-    include(priceIsSmaller(Price), Subsets, ValidSubsets),
-    writeln(ValidSubsets).
+sizeIsSmaller(Size, Items) :-
+    maplist(nth0(3), Items, Sizes),
+    sum_list(Sizes, TotalSize),
+    TotalSize < Size.
+
+isGryffindor([Name, _, _, _]) :-
+    houseOf(gryffindor, Name).
+
+isSlytherin([Name, _, _, _]) :-
+    houseOf(slytherin, Name).
+
+isRavenclaw([Name, _, _, _]) :-
+    houseOf(ravenclaw, Name).
+
+isHufflepuff([Name, _, _, _]) :-
+    houseOf(hufflepuff, Name).
+
+combs([],[]).
+
+combs([_ | T], T2) :-
+    combs(T, T2).
+combs([H | T], [H | T2]) :-
+    combs(T, T2).
+
+separateHouses(Items, Gryffindor, Slytherin, Ravenclaw, Hufflepuff) :-
+    include(isGryffindor, Items, Gryffindor),
+    include(isHufflepuff, Items, Hufflepuff),
+    include(isRavenclaw, Items, Ravenclaw),
+    include(isSlytherin, Items, Slytherin).
+
+generateCombinations(Items, ValidSubsets) :-
+    findall(Subset, combs(Items, Subset), ValidSubsets).
+
+priceGreater(Subsets, Price, ValidSubsets) :-
+    include(priceIsGreater(Price), Subsets, ValidSubsets).
+
+priceSmaller(Subsets, Price, ValidSubsets) :-
+    include(priceIsSmaller(Price), Subsets, ValidSubsets).
+
+sizeGreater(Subsets, Price, ValidSubsets) :-
+    include(sizeIsGreater(Price), Subsets, ValidSubsets).
+
+sizeSmaller(Subsets, Price, ValidSubsets) :-
+    include(sizeIsSmaller(Price), Subsets, ValidSubsets).
 
 
 % Main 
@@ -70,12 +104,15 @@ main :-
     nlpParser(Lines, [], ItemsReversed, [], ConstraintsReversed),
     reverse(ItemsReversed, Items),
     reverse(ConstraintsReversed, Constraints),
-    % writeln(Items),
-    % writeln(Constraints),
-    % priceGreater(Items, 1000),
-    Vs = [_,_,_], 
-    global_cardinality(Vs, [1-2,3-_]), 
-    label(Vs),
+
+    separateHouses(Items, Gryffindor, Slytherin, Ravenclaw, Hufflepuff),
+    % test for ravenclaw
+    generateCombinations(Ravenclaw, ValidSubsets),
+    priceGreater(ValidSubsets, 700, ValidSubsets1),
+    sizeGreater(ValidSubsets1, 80, ValidSubsets2),
+    writeln(ValidSubsets2),
+
+
     close(Stream).
 
 
