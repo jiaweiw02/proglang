@@ -16,5 +16,3 @@ gryffindor house wants total price greater than 500 dollars and total volume gre
 slytherin house wants total volume less than 50 cubic feet and total price greater than 600 dollars.
 ravenclaw house wants total volume greater than 80 cubic feet and total price greater than 700 dollars.
 hufflepuff house wants total volume less than 20 cubic feet and total price greater than 250 dollars.
-hufflepuff house wants total volume less than 20 cubic feet and total price less than 250 dollars.
-hufflepuff house wants total volume less than 20 cubic feet and total price greater than 1000 dollars.

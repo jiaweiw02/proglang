@@ -27,13 +27,6 @@ nlpParser([[House, house, wants, total, volume, CompSize, than, Size, cubic, fee
     atom_number(Size, SizeNumber),
     nlpParser(T, ItemC, ItemR, [ [House, CompPrice, PriceNumber, CompSize, SizeNumber] | ConstraintC], ConstraintR).
 
-% totalPrice([], Res, Res).
-% totalPrice([[_, _, Price, _] | T], Sum, Res) :-
-%     totalPrice(T, Sum + Price, Res).
-
-% totalSize([], Res, Res).
-% totalSize([[_, _, _, Size] | T], Sum, Res) :-
-%     totalSize(T, Sum + Size, Res).
 
 priceIsGreater(Price, Items) :-
     maplist(nth0(2), Items, Prices),
@@ -55,17 +48,9 @@ sizeIsSmaller(Size, Items) :-
     sum_list(Sizes, TotalSize),
     TotalSize < Size.
 
-isGryffindor([Name, _, _, _]) :-
-    houseOf(gryffindor, Name).
 
-isSlytherin([Name, _, _, _]) :-
-    houseOf(slytherin, Name).
-
-isRavenclaw([Name, _, _, _]) :-
-    houseOf(ravenclaw, Name).
-
-isHufflepuff([Name, _, _, _]) :-
-    houseOf(hufflepuff, Name).
+isHouse(House, [Name, _, _, _]) :-
+    houseOf(House, Name).
 
 combs([],[]).
 
@@ -74,26 +59,49 @@ combs([_ | T], T2) :-
 combs([H | T], [H | T2]) :-
     combs(T, T2).
 
-separateHouses(Items, Gryffindor, Slytherin, Ravenclaw, Hufflepuff) :-
-    include(isGryffindor, Items, Gryffindor),
-    include(isHufflepuff, Items, Hufflepuff),
-    include(isRavenclaw, Items, Ravenclaw),
-    include(isSlytherin, Items, Slytherin).
 
 generateCombinations(Items, ValidSubsets) :-
     findall(Subset, combs(Items, Subset), ValidSubsets).
 
-priceGreater(Subsets, Price, ValidSubsets) :-
+priceFilter(greater, Subsets, Price, ValidSubsets) :-
     include(priceIsGreater(Price), Subsets, ValidSubsets).
 
-priceSmaller(Subsets, Price, ValidSubsets) :-
+priceFilter(less, Subsets, Price, ValidSubsets) :-
     include(priceIsSmaller(Price), Subsets, ValidSubsets).
 
-sizeGreater(Subsets, Price, ValidSubsets) :-
-    include(sizeIsGreater(Price), Subsets, ValidSubsets).
+sizeFilter(greater, Subsets, Size, ValidSubsets) :-
+    include(sizeIsGreater(Size), Subsets, ValidSubsets).
 
-sizeSmaller(Subsets, Price, ValidSubsets) :-
-    include(sizeIsSmaller(Price), Subsets, ValidSubsets).
+sizeFilter(less, Subsets, Size, ValidSubsets) :-
+    include(sizeIsSmaller(Size), Subsets, ValidSubsets).
+
+
+filter([House, PriceConstraint, Price, SizeConstraint, Size], Items, Result) :-
+    include(isHouse(House), Items, HouseItems),
+    generateCombinations(HouseItems, ValidSubsets),
+    priceFilter(PriceConstraint, ValidSubsets, Price, ValidSubsets1),
+    sizeFilter(SizeConstraint, ValidSubsets1, Size, Result),
+    writeln(House).
+
+
+printResults([], _).
+printResults([C | T], Items) :-
+    filter(C, Items, ResultsReversed),
+    reverse(ResultsReversed, Result),
+    printResultHelper(Result),
+    printResults(T, Items).
+
+printResultHelper([]).
+printResultHelper([H | T]) :-
+    maplist(nth0(1), H, ItemNames),
+    maplist(nth0(2), H, ItemPrices),
+    maplist(nth0(3), H, ItemSizes),
+    sum_list(ItemPrices, TotalPrice),
+    sum_list(ItemSizes, TotalSize),
+    format("\t[~w,~w]:~p~n", [TotalPrice, TotalSize, ItemNames]),
+    % write(TotalPrice), write(' '), write(TotalSize), write(' '), writeln(ItemNames),
+    printResultHelper(T).
+
 
 
 % Main 
@@ -104,15 +112,7 @@ main :-
     nlpParser(Lines, [], ItemsReversed, [], ConstraintsReversed),
     reverse(ItemsReversed, Items),
     reverse(ConstraintsReversed, Constraints),
-
-    separateHouses(Items, Gryffindor, Slytherin, Ravenclaw, Hufflepuff),
-    % test for ravenclaw
-    generateCombinations(Ravenclaw, ValidSubsets),
-    priceGreater(ValidSubsets, 700, ValidSubsets1),
-    sizeGreater(ValidSubsets1, 80, ValidSubsets2),
-    writeln(ValidSubsets2),
-
-
+    printResults(Constraints, Items),
     close(Stream).
 
 
