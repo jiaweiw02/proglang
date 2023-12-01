@@ -1,0 +1,4 @@
+slytherin
+	[400,15]:[d]
+gryffindor
+	[533,63]:[x,b,c]
